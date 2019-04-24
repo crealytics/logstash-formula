@@ -1,3 +1,12 @@
+{% set default_pipeline = {} %}
+{%- if pillar['logstash']['inputs'] is defined or pillar['logstash']['outputs'] is defined or pillar['logstash']['filters'] is defined %}
+  {% set default_pipeline = {'pipelines': {'default_logstash_salt_formula_pipeline': {} }} %}
+  {%- for logstash_plugin in ['inputs', 'outputs', 'filters'] %}}
+    {%- if pillar['logstash'][logstash_plugin] is defined %}
+      {%- do default_pipeline.pipelines.default_logstash_salt_formula_pipeline.update({logstash_plugin: pillar['logstash'][logstash_plugin] }) %}
+    {%- endif %}}
+  {%- endfor %}}
+{%- endif %}}
 {% set logstash = salt['grains.filter_by']({
   'Debian': {
     'use_upstream_repo': True,
@@ -15,7 +24,9 @@
     'indent': 4,
     'java': 'java-1.8.0-openjdk',
   }
-}, merge=salt['pillar.get']('logstash')) %}
+}, merge=salt['pillar.get']('logstash', default=default_pipeline, merge=True)) %}
+
+
 
 {%- macro output_indented(col, string) %}
 {{ string|indent(col, true) -}}

@@ -1,0 +1,11 @@
+{%- from 'logstash/map.jinja' import logstash with context -%}
+
+{%- for pipeline_key, pipeline_value in logstash.pipelines|dictsort %} {# Start of the pipelines for #}
+- pipeline.id: {{ pipeline_key }}
+  path.config: "/etc/logstash/{{ pipeline_key }}/*.conf"
+  {%- for config_key, config_value in pipeline_value|dictsort %} {# Start of the pipeline configuration for #}
+     {%- if config_key not in ['inputs', 'filters', 'outputs'] %}
+  {{ config_key }}: {{ config_value }}
+      {%- endif %}
+  {%- endfor %} {# End of the pipeline configuration for #}
+{%- endfor %} {# End of the pipelines for #}

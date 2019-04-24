@@ -44,56 +44,98 @@ add adm group to logstash service account:
 {%- endif %}
 {% endif %}
 
-{%- if logstash.inputs is defined %}
-logstash-config-inputs:
+logstash-config-dir-empty:
+  file.directory:
+    - name: /etc/logstash/conf.d
+    - user: root
+    - group: root
+    - mode: 755
+    - makedirs: True
+    - require:
+      - pkg: logstash-pkg
+    - clean: True
+
+logstash-config-pipelines:
   file.managed:
-    - name: /etc/logstash/conf.d/01-inputs.conf
+    - name: /etc/logstash/pipelines.yml
+    - user: root
+    - group: root
+    - mode: 755
+    - source: salt://logstash/files/pipelines.yml
+    - template: jinja
+    - require:
+      - pkg: logstash-pkg
+
+{% for pipeline in logstash.pipelines %} {# Start of the pipelines for #}
+
+logstash-config-{{ pipeline }}-dir:
+  file.directory:
+    - name: /etc/logstash/{{ pipeline }}
+    - user: root
+    - group: root
+    - mode: 755
+    - makedirs: True
+    - require:
+      - pkg: logstash-pkg
+
+{%- if logstash.pipelines[pipeline].inputs is defined %}
+logstash-config-{{ pipeline }}-inputs:
+  file.managed:
+    - name: /etc/logstash/{{ pipeline }}/01-inputs.conf
     - user: root
     - group: root
     - mode: 755
     - source: salt://logstash/files/01-inputs.conf
     - template: jinja
+    - context:
+      pipeline: {{ pipeline }}
     - require:
       - pkg: logstash-pkg
 {%- else %}
-logstash-config-inputs:
+logstash-config-{{ pipeline }}-inputs:
   file.absent:
-    - name: /etc/logstash/conf.d/01-inputs.conf
+    - name: /etc/logstash/{{ pipeline }}/01-inputs.conf
 {%- endif %}
 
-{%- if logstash.filters is defined %}
-logstash-config-filters:
+{%- if logstash.pipelines[pipeline].filters is defined %}
+logstash-config-{{ pipeline }}-filters:
   file.managed:
-    - name: /etc/logstash/conf.d/02-filters.conf
+    - name: /etc/logstash/{{ pipeline }}/02-filters.conf
     - user: root
     - group: root
     - mode: 755
     - source: salt://logstash/files/02-filters.conf
     - template: jinja
+    - context:
+      pipeline: {{ pipeline }}
     - require:
       - pkg: logstash-pkg
 {%- else %}
-logstash-config-filters:
+logstash-config-{{ pipeline }}-filters:
   file.absent:
-    - name: /etc/logstash/conf.d/02-filters.conf
+    - name: /etc/logstash/{{ pipeline }}/02-filters.conf
 {%- endif %}
 
-{%- if logstash.outputs is defined %}
-logstash-config-outputs:
+{%- if logstash.pipelines[pipeline].outputs is defined %}
+logstash-config-{{ pipeline }}-outputs:
   file.managed:
-    - name: /etc/logstash/conf.d/03-outputs.conf
+    - name: /etc/logstash/{{ pipeline }}/03-outputs.conf
     - user: root
     - group: root
     - mode: 755
     - source: salt://logstash/files/03-outputs.conf
     - template: jinja
+    - context:
+      pipeline: {{ pipeline }}
     - require:
       - pkg: logstash-pkg
 {%- else %}
-logstash-config-outputs:
+logstash-config-{{ pipeline }}-outputs:
   file.absent:
-    - name: /etc/logstash/conf.d/03-outputs.conf
+    - name: /etc/logstash/{{ pipeline }}/03-outputs.conf
 {%- endif %}
+
+{% endfor %} {# End of the pipelines for #}
 
 logstash-svc:
   service.running:
@@ -102,6 +144,9 @@ logstash-svc:
     - require:
       - pkg: logstash-pkg
     - watch:
-      - file: logstash-config-inputs
-      - file: logstash-config-filters
-      - file: logstash-config-outputs
+      - file: /etc/logstash/pipelines.yml
+{% for pipeline in logstash.pipelines %} {# Start of the pipelines for #}
+      - file: logstash-config-{{ pipeline }}-inputs
+      - file: logstash-config-{{ pipeline }}-filters
+      - file: logstash-config-{{ pipeline }}-outputs
+{% endfor %} {# End of the pipelines for #}
